@@ -1,0 +1,167 @@
+
+``` {r load-libraries, echo=TRUE}
+# Load in the data set and change the CLASS attribute from character type to factor type for 
+# convenience of classification
+rice <- read.csv("~/downloads/RiceDataset.txt",sep="")
+rice$CLASS <- as.factor(rice$CLASS)
+
+# load in the libsvm library
+library(e1071) 
+
+# Create a sequence of numbers ranging from 1 to the number rows in rice for later use.
+index <- 1:nrow(rice) 
+
+# Set a specific-valued seed to ensure the agreement of outcomes across different sampling 
+# process, thus to guarantee the reproductivity of our experiment results.
+set.seed(123) 
+
+# Sample 1/3 portion of the index sequence randomly and form a testindex sequence.
+testindex <- sample(index, trunc(length(index)/3)) 
+
+# Extract the data as specified by testindex from the rice dataset.
+testset <- rice[testindex,] 
+
+# Get all the remaining data whose indices are exclusive from the testIndex.
+trainset <- rice[-testindex,] 
+
+# Use the svm method given by libsvm to develop a linear classification model based on the 
+# train set, with the dependent variable "CLASS" and the type of classfication method 
+# "C-Classification" 
+svm.model <- svm(CLASS ~ ., data = trainset,type="C-classification",
+                 kernel="linear") 
+
+# Predict and classify the data from training and test set based on their features using 
+# the model and store their classification results.
+results_train <- predict(svm.model,trainset[,-8]) 
+results_test <- predict(svm.model, testset[,-8] ) 
+
+# Form the confusion matrix based on the predicted and actual classes for the training and 
+# test set.
+cf.train <- as.matrix(table(pred=results_train,actual=trainset$CLASS)) 
+cf.test <- as.matrix(table(pred=results_test,actual=testset$CLASS)) 
+
+accuracy_train_l <- sum(diag(cf.train)) / sum(cf.train)
+accuracy_test_l <- sum(diag(cf.test)) / sum(cf.test)
+```
+
+Change the linear kernel to polynomial, radial, sigmoid kernels (with default parameters).
+
+``` {r change-of-svm-kernels_polynomial, echo=TRUE}
+# svm with polynomial kernel:
+svm.model_p <- svm(CLASS ~ ., data = trainset,type="C-classification",
+                 kernel="polynomial") 
+results_train_p <- predict(svm.model_p,trainset[,-8]) 
+results_test_p <- predict(svm.model_p, testset[,-8] ) 
+cf.train_p <- as.matrix(table(pred=results_train_p,actual=trainset$CLASS)) 
+cf.test_p <- as.matrix(table(pred=results_test_p,actual=testset$CLASS)) 
+accuracy_train_p <- sum(diag(cf.train_p)) / sum(cf.train_p)
+accuracy_test_p <- sum(diag(cf.test_p)) / sum(cf.test_p)
+```
+
+``` {r change-of-svm-kernels_radial, echo=TRUE}
+# svm with radial kernels:
+svm.model_r <- svm.model <- svm(CLASS ~ ., data = trainset,type="C-classification",
+                                kernel="radial")
+results_train_r <- predict(svm.model_r,trainset[,-8]) 
+results_test_r <- predict(svm.model_r, testset[,-8] ) 
+cf.train_r <- as.matrix(table(pred=results_train_r,actual=trainset$CLASS)) 
+cf.test_r <- as.matrix(table(pred=results_test_r,actual=testset$CLASS)) 
+accuracy_train_r <- sum(diag(cf.train_r)) / sum(cf.train_r)
+accuracy_test_r <- sum(diag(cf.test_r)) / sum(cf.test_r)          
+```
+
+``` {r change-of-svm-kernels_sigmoid, echo=TRUE}
+# svm with sigmoid kernels:
+svm.model_s <- svm.model <- svm(CLASS ~ ., data = trainset,type="C-classification",
+                                kernel="sigmoid") 
+results_train_s <- predict(svm.model_s,trainset[,-8]) 
+results_test_s <- predict(svm.model_s, testset[,-8] ) 
+cf.train_s <- as.matrix(table(pred=results_train_s,actual=trainset$CLASS)) 
+cf.test_s <- as.matrix(table(pred=results_test_s,actual=testset$CLASS)) 
+accuracy_train_s <- sum(diag(cf.train_s)) / sum(cf.train_s)
+accuracy_test_s <- sum(diag(cf.test_s)) / sum(cf.test_s)
+````
+
+``` {r summary, echo=TRUE}
+# Summary:
+c(accuracy_train_l,accuracy_test_l)
+cf.test
+c(accuracy_train_p,accuracy_test_p)
+cf.test_p
+c(accuracy_train_r,accuracy_test_r)
+cf.test_r
+cat(accuracy_train_s,accuracy_test_s)
+cf.test_s
+```
+
+Obviously that the radial kernel works better than the two other possible kernels, but turns out no better than linear kernel in terms of the test set prediction accuracy.
+
+To be more precise, we decide to tune the radial model and further investigates its relation with linear kernel.
+
+Run the grid search process and select the optimal hyperparameters for this model.
+
+``` {r tune-the-model, echo = TRUE}
+obj <- tune(svm,CLASS ~ .,data=trainset,ranges = list(gamma = 2^(-3:3), cost = 2^(-1:5)),
+tunecontrol = tune.control(nrepeat = 10, sampling = "cross", cross = 10))
+
+summary(obj)
+
+plot(obj)
+```
+
+``` {r compare-accuracy, echo=TRUE}
+# Use the results yielded above to train the radial svm model for classification 
+# and check the accuracy.
+svm.model_newr <- svm(CLASS ~ ., data = trainset,type="C-classification",
+                        kernel='radial',gamma = 0.125, cost=0.5) 
+results_train_newr <- predict(svm.model_newr,trainset[,-8]) 
+results_test_newr <- predict(svm.model_newr, testset[,-8] ) 
+cf.train_newr <- as.matrix(table(pred=results_train_newr,actual=trainset$CLASS)) 
+cf.test_newr <- as.matrix(table(pred=results_test_newr,actual=testset$CLASS)) 
+accuracy_train_newr <- sum(diag(cf.train_newr)) / sum(cf.train_newr)
+accuracy_test_newr <- sum(diag(cf.test_newr)) / sum(cf.test_newr)
+
+# Check accuracies.
+c(accuracy_train_l,accuracy_test_l) 
+cf.test
+c(accuracy_train_newr,accuracy_test_newr) 
+cf.test_newr
+```
+
+Conclusion: it turns out that however we choose the hyperparameter values for this model,
+it still functions no better than the linear model.
+
+In this case, though the difference is trivial, we prefer linear svm because it scales more
+flexibly with the size of data input and takes less time to output the model and to predict
+the results.
+
+To interpret the result, we can see more clearly and heuristically from a matrix of 
+scatterplots among all 7 independent variables for rice.
+
+``` {r plot-and-justify, echo=TRUE}
+# To interpret the model selection result, we can see more clearly and heuristically from a 
+# matrix of scatterplots among all 7 independent variables for rice.
+
+index1 <- sample(index, trunc(length(index)/60)) 
+rice1 <- rice[index1,]
+pairs(rice1[,-8],col=c('blue','red')[rice1$CLASS],pch = c("o","+")[1:150 %in% svm.model$index + 1])
+```
+In the scatterplot below, it plots the data points across two randomly selected features, where the black and red circles represent the two different classes, and the crosses represent this point lies on the support vectors. It can be clearly seen that these data points are almost linearly separable despite some tolerable external derivations, hence a linear kernel would perform better in classifying the data points than a polynomial kernel, which includes the risks of overfitting.
+
+``` {r plot-and-justify-2, echo=TRUE}
+# Specifically, visualize one pair of features out of all 7-7 combinations 
+# (classes by color, SV by crosses):
+plot(cmdscale(dist(testset[,-8])),
+     col = as.integer(testset[,8]),
+     pch = c("o","+")[1:150 %in% svm.model$index + 1])
+```
+
+Obviously from the grid that for most of the feature combinations, data points, with some due external derivations, are linear separable and can be properly classified using a straight line. It will be unnecessary to adopt the more adaptive model with radial kernel in this case.
+
+
+
+
+
+
+
+
