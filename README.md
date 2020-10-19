@@ -1,4 +1,4 @@
-# Using SVM to classify the Rice Dataset: SVM model selection and tuning process
+# SVM for Classifying the Rice Dataset: model selection and tuning process
 
 Specifically, the dataset is from the UCI Machine Learning Repository https://archive.ics.uci.edu/ml/datasets/Rice+%28Cammeo+and+Osmancik%29
 
